@@ -16,7 +16,7 @@ const assetSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PHONE', 'ROUTER', 'SERVER', 'SOFTWARE_LICENSE', 'OTHER'],
+      enum: ['LAPTOP', 'DESKTOP', 'MONITOR', 'PRINTER', 'PHONE', 'ROUTER', 'SERVER', 'SOFTWARE_LICENSE', 'ACCESSORY', 'OTHER'],
       default: 'LAPTOP',
       required: true,
     },

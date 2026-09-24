@@ -104,7 +104,7 @@ const ticketSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['MANUAL', 'AI_ASSISTANT'],
+      enum: ['MANUAL', 'AI_ASSISTANT', 'WEB_PORTAL', 'EMAIL', 'API'],
       default: 'MANUAL',
     },
     resolutionSummary: {

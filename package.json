@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "node server/server.js",
     "server": "node server/server.js",
     "seed": "node server/scripts/seed.js",
     "test:api": "node server/scripts/testApis.js",
