@@ -17,6 +17,7 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import {
   Home,
@@ -130,8 +131,9 @@ export default function AppShell({ activePage, setActivePage, children }) {
   const currentNav = allNavItems.find((n) => n.id === activePage);
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-[#fafafa] dark:bg-[#09090b] font-sans text-[#171717] dark:text-[#f4f4f5] transition-colors duration-200">
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={true}>
+        <div className="min-h-screen flex w-full bg-[#fafafa] dark:bg-[#09090b] font-sans text-[#171717] dark:text-[#f4f4f5] transition-colors duration-200">
         {/* ─── Shadcn Sidebar Component ────────────────────────────────── */}
         <Sidebar collapsible="icon" className="border-r border-[#e5e5e5] dark:border-[#27272a] bg-white dark:bg-[#0c0c0e]">
           <SidebarHeader className="border-b border-[#e5e5e5] dark:border-[#27272a] p-3 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
@@ -283,5 +285,6 @@ export default function AppShell({ activePage, setActivePage, children }) {
         </SidebarInset>
       </div>
     </SidebarProvider>
+    </TooltipProvider>
   );
 }
