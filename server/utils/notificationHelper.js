@@ -1,5 +1,6 @@
 import { Notification } from '../models/Notification.js';
 import { User } from '../models/User.js';
+import { emitEvent } from '../socket.js';
 
 /**
  * Creates a notification for a single recipient
@@ -14,7 +15,7 @@ export const createNotification = async ({
 }) => {
   try {
     if (!recipientId) return null;
-    return await Notification.create({
+    const doc = await Notification.create({
       recipient: recipientId,
       type,
       title,
@@ -23,6 +24,9 @@ export const createNotification = async ({
       relatedId,
       isRead: false,
     });
+
+    emitEvent('notification:new', doc, `user:${recipientId}`);
+    return doc;
   } catch (error) {
     console.error('[Notification Error] Failed to create notification:', error.message);
     return null;
@@ -59,7 +63,9 @@ export const notifyRoleUsers = async ({
       isRead: false,
     }));
 
-    return await Notification.insertMany(notifications);
+    const docs = await Notification.insertMany(notifications);
+    emitEvent('notification:role', { role, title, message, relatedEntity, relatedId }, `role:${role}`);
+    return docs;
   } catch (error) {
     console.error('[Notification Error] Failed to broadcast notification:', error.message);
     return [];

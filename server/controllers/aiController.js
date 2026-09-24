@@ -2,6 +2,7 @@ import { AiSession } from '../models/AiSession.js';
 import { TroubleshootingGuide } from '../models/TroubleshootingGuide.js';
 import { Category } from '../models/Category.js';
 import { Asset } from '../models/Asset.js';
+import { Department } from '../models/Department.js';
 import { Ticket } from '../models/Ticket.js';
 import { generateNextTicketNumber } from '../utils/ticketNumber.js';
 import { calculateSlaDeadlines } from '../utils/slaCalculator.js';
@@ -103,13 +104,12 @@ export const aiChat = async (req, res) => {
     });
   }
 
-  // Handle Action buttons: SOLVED
+  // Handle Action: SOLVED
   if (action === 'SOLVED') {
     session.status = 'RESOLVED';
     const resolvedMsg = {
       role: 'assistant',
-      content: 'Glad to hear that fixed the problem! Feel free to reach out anytime if you experience any technical issues.',
-      options: ['Start New Conversation'],
+      content: 'Glad to hear that fixed the problem. Feel free to reach out anytime if you experience any other technical issues.',
     };
     session.messages.push(resolvedMsg);
     await session.save();
@@ -139,10 +139,23 @@ export const aiChat = async (req, res) => {
     let suggestedCat = session.category || guide?.category || categories[0];
     let suggestedPriority = guide?.suggestedPriority || 'MEDIUM';
 
+    // Synthesize structured technician ticket description from the conversation
+    let suggestedDescription = '';
+    if (aiService.hasApiKey()) {
+      const conversationToPass = session.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      suggestedDescription = await aiService.generateEscalationSummary(conversationToPass);
+    }
+
+    if (!suggestedDescription) {
+      suggestedDescription = `### Problem Summary\n${session.problemDescription || message || 'Issue requiring IT assistance'}\n\n### Symptoms Observed\n- ${session.problemDescription || message || 'User reported technical issue'}\n\n### Recommended Technician Action\nInvestigate workstation diagnostics and assist employee.`;
+    }
+
     const reply = {
       role: 'assistant',
-      content: `I'll be glad to help you file an IT Support ticket right away with the details from our conversation. Please review and confirm the ticket details below.`,
-      options: ['Confirm & Create Ticket'],
+      content: `I will prepare an IT Support ticket with the diagnostic details from our conversation. Please review the ticket details below and submit when ready.`,
     };
     session.messages.push(reply);
     await session.save();
@@ -153,6 +166,7 @@ export const aiChat = async (req, res) => {
       status: 'ESCALATED',
       canCreateTicket: true,
       suggestedTitle,
+      suggestedDescription,
       suggestedCategory: suggestedCat,
       suggestedPriority,
       userAssets,
@@ -172,9 +186,18 @@ export const aiChat = async (req, res) => {
 
   // 1. If LLM Provider is configured with API key (Groq, Gemini, OpenAI, Ollama), generate real AI dialogue
   if (aiService.hasApiKey()) {
-    let guideContext = '';
+    const userAssets = await Asset.find({ assignedUser: req.user._id, status: 'ASSIGNED' });
+    const assetInfo = userAssets.map((a) => `${a.name} (Tag: ${a.assetTag || 'N/A'}, Model: ${a.model || 'Standard'})`).join(', ') || 'None assigned';
+    let deptName = 'General Staff';
+    if (req.user.department) {
+      const d = await Department.findById(req.user.department);
+      if (d) deptName = d.name;
+    }
+
+    let dynamicContext = `EMPLOYEE CONTEXT:\n- Name: ${req.user.name}\n- Department: ${deptName}\n- Assigned Company Devices: ${assetInfo}\n`;
+
     if (guide) {
-      guideContext = `Relevant Knowledge Guide: "${guide.title}"\nSymptoms: ${guide.symptoms?.join(', ')}\nGuide Steps:\n${guide.steps?.map((s) => `${s.stepNumber}. ${s.instruction} (${s.details || ''})`).join('\n')}`;
+      dynamicContext += `\nRELEVANT INTERNAL KNOWLEDGE GUIDE: "${guide.title}"\nSymptoms: ${guide.symptoms?.join(', ')}\nStep-by-step diagnostic guide:\n${guide.steps?.map((s) => `${s.stepNumber}. ${s.instruction} (${s.details || ''})`).join('\n')}`;
     }
 
     const conversationToPass = session.messages.map((m) => ({
@@ -182,12 +205,11 @@ export const aiChat = async (req, res) => {
       content: m.content,
     }));
 
-    const llmReply = await aiService.generateChatResponse(conversationToPass, guideContext);
+    const llmReply = await aiService.generateChatResponse(conversationToPass, dynamicContext);
     if (llmReply) {
       const replyObj = {
         role: 'assistant',
         content: llmReply,
-        options: ['It worked! 🎉', 'Still having issues ➡️', 'File an IT Ticket 🎫'],
       };
       session.messages.push(replyObj);
       await session.save();
@@ -216,8 +238,7 @@ export const aiChat = async (req, res) => {
       const step = steps[nextIdx - 1];
       const reply = {
         role: 'assistant',
-        content: `Got it. Let's try the next step:\n\n**Step ${step.stepNumber}: ${step.instruction}**\n\n${step.details || ''}\n\nLet me know how that goes, or tell me if you'd prefer to file an IT ticket now.`,
-        options: ['Yes, Issue Solved! 🎉', 'Next Step ➡️', 'Create IT Ticket 🎫'],
+        content: `Understood. Please try the next troubleshooting step:\n\n**Step ${step.stepNumber}: ${step.instruction}**\n\n${step.details || ''}\n\nLet me know if this resolves the issue or if you would like to escalate to an official IT ticket.`,
       };
       session.messages.push(reply);
       await session.save();
@@ -237,18 +258,17 @@ export const aiChat = async (req, res) => {
     const firstStep = guide.steps?.[0];
     const diagQuestion = guide.diagnosticQuestions?.[0]?.question;
 
-    let responseContent = `I understand you're experiencing an issue with **${guide.title}**.\n\n`;
+    let responseContent = `I understand you are experiencing an issue with **${guide.title}**.\n\n`;
     if (diagQuestion && turnCount <= 1) {
       responseContent += `${diagQuestion}\n\n`;
     }
     if (firstStep) {
-      responseContent += `**Initial Recommended Step (${firstStep.stepNumber})**: ${firstStep.instruction}\n${firstStep.details || ''}`;
+      responseContent += `**Initial Recommended Step (${firstStep.stepNumber})**: ${firstStep.instruction}\n\n${firstStep.details || ''}`;
     }
 
     const reply = {
       role: 'assistant',
       content: responseContent,
-      options: ['It worked! 🎉', 'Didn’t work, next step ➡️', 'File a Ticket 🎫'],
     };
     session.messages.push(reply);
     await session.save();
@@ -264,8 +284,7 @@ export const aiChat = async (req, res) => {
   // General conversational assistance
   const generalReply = {
     role: 'assistant',
-    content: `I've analyzed your description: "${message || session.problemDescription}".\n\nTo help isolate this, could you share:\n1. When did this first start occurring?\n2. Does restarting the application or device change anything?\n\nIf you'd like me to file a ticket for an IT technician right now, just say "create ticket" or click the button below.`,
-    options: ['Create Support Ticket 🎫', 'Restarted already, still broken', 'Issue started today'],
+    content: `I have analyzed your description: "${message || session.problemDescription}".\n\nTo help isolate this problem:\n1. When did this first start occurring?\n2. Does restarting the device or application resolve it?\n\nIf you prefer to submit a ticket for technician review, you can ask me to "create ticket" or use the manual option above.`,
   };
   session.messages.push(generalReply);
   await session.save();
@@ -365,15 +384,18 @@ export const aiEscalate = async (req, res) => {
     session = await AiSession.findById(sessionId);
   }
 
-  const finalTitle = title || session?.problemDescription || 'AI Escalated Support Request';
-  let fullDescription = description || session?.problemDescription || 'Issue escalated from AI Support Assistant.';
+  const finalTitle = title || session?.problemDescription || 'Support Request';
+  let fullDescription = description;
 
-  // Append troubleshooting transcript context
-  if (session && session.messages && session.messages.length) {
-    fullDescription += '\n\n--- [AI Troubleshooting Transcript] ---';
-    session.messages.forEach((m) => {
-      fullDescription += `\n[${m.role.toUpperCase()}]: ${m.content}`;
-    });
+  if (!fullDescription && session && session.messages && session.messages.length) {
+    if (aiService.hasApiKey()) {
+      const convo = session.messages.map((m) => ({ role: m.role, content: m.content }));
+      fullDescription = await aiService.generateEscalationSummary(convo);
+    }
+  }
+
+  if (!fullDescription) {
+    fullDescription = session?.problemDescription || 'Support request submitted via AI Assistant.';
   }
 
   let finalCategory = categoryId;
@@ -454,3 +476,53 @@ export const getAiSessions = async (req, res) => {
     data: sessions,
   });
 };
+
+// @desc    Get AI Provider & Model Configuration (Admin)
+// @route   GET /api/ai/config
+// @access  Private (Admin)
+export const getAiConfig = async (req, res) => {
+  const provider = process.env.AI_PROVIDER || 'groq';
+  const model = process.env.AI_MODEL || 'openai/gpt-oss-120b';
+  const hasApiKey = Boolean(process.env.AI_API_KEY && process.env.AI_API_KEY !== 'your_groq_api_key_here');
+
+  res.status(200).json({
+    success: true,
+    data: {
+      provider,
+      model,
+      configured: hasApiKey,
+      status: hasApiKey ? 'ACTIVE' : 'FALLBACK_ONLY',
+      baseUrl: process.env.AI_BASE_URL || 'Default Endpoint',
+    },
+  });
+};
+
+// @desc    Test Live AI Connection & Latency (Admin)
+// @route   POST /api/ai/test
+// @access  Private (Admin)
+export const testAiConnection = async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const result = await aiService.complete([
+      { role: 'system', content: 'You are the ServiceDesk AI Diagnostic engine. Reply with a short JSON confirmation: {"status": "ONLINE", "message": "ServiceDesk AI operational."}' },
+      { role: 'user', content: 'Ping test' },
+    ]);
+
+    const latencyMs = Date.now() - startTime;
+
+    res.status(200).json({
+      success: true,
+      latencyMs,
+      provider: process.env.AI_PROVIDER || 'groq',
+      model: process.env.AI_MODEL || 'openai/gpt-oss-120b',
+      response: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      latencyMs: Date.now() - startTime,
+      message: err.message || 'AI Connection Test Failed',
+    });
+  }
+};
+

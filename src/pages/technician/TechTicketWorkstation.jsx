@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { getTicketById, addComment, resolveTicket } from '../../api/ticketApi';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { apiRequest } from '../../api/client';
 import TicketTimeline from '../../components/tickets/TicketTimeline';
 import {
@@ -22,14 +24,22 @@ import {
   Flame,
   Check,
   Zap,
+  UserCheck,
 } from 'lucide-react';
+
+import { useSocket } from '../../context/SocketContext';
 
 export default function TechTicketWorkstation({ ticketId, onBack }) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { socket } = useSocket();
   const [ticket, setTicket] = useState(null);
   const [comments, setComments] = useState([]);
   const [workLogs, setWorkLogs] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const isManagerOrAdmin = user && ['MANAGER', 'ADMIN', 'ASSET_MANAGER'].includes(user.role);
 
   // Message & Internal Note states
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'PUBLIC' | 'INTERNAL'
@@ -51,13 +61,30 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
   const [resolutionSummary, setResolutionSummary] = useState('');
   const [submittingResolution, setSubmittingResolution] = useState(false);
 
+  // Manager action states
+  const [reassigning, setReassigning] = useState(false);
+  const [updatingPriority, setUpdatingPriority] = useState(false);
+
   const loadTicket = async () => {
     try {
-      const res = await getTicketById(ticketId);
-      if (res.success && res.data) {
-        setTicket(res.data);
-        setComments(res.data.comments || []);
-        setWorkLogs(res.data.workLogs || []);
+      const [tRes, uRes] = await Promise.all([
+        getTicketById(ticketId),
+        apiRequest('/users'),
+      ]);
+
+      if (tRes.success && tRes.data) {
+        setTicket(tRes.data);
+        setComments(tRes.data.comments || []);
+        setWorkLogs(tRes.data.workLogs || []);
+      }
+
+      if (uRes.success) {
+        // Strictly only show TECHNICIAN accounts
+        setTechnicians(
+          (uRes.data || []).filter(
+            (u) => u.role === 'TECHNICIAN' && u.status === 'ACTIVE'
+          )
+        );
       }
     } catch (err) {
       console.error('Failed to load workstation ticket:', err);
@@ -66,9 +93,89 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
     }
   };
 
+  const handleReassignTech = async (techId) => {
+    if (!techId) return;
+    setReassigning(true);
+    try {
+      const res = await apiRequest(`/tickets/${ticketId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ technicianId: techId }),
+      });
+      if (res.success) {
+        toast.success('Technician successfully reassigned');
+        await loadTicket();
+      }
+    } catch (err) {
+      toast.error('Failed to reassign technician: ' + err.message);
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  const handleEscalatePriority = async (newPriority) => {
+    if (!newPriority || newPriority === ticket?.priority) return;
+    setUpdatingPriority(true);
+    try {
+      const res = await apiRequest(`/tickets/${ticketId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ priority: newPriority }),
+      });
+      if (res.success) {
+        toast.success(`Priority updated to ${newPriority}`);
+        await loadTicket();
+      }
+    } catch (err) {
+      toast.error('Failed to update priority: ' + err.message);
+    } finally {
+      setUpdatingPriority(false);
+    }
+  };
+
   useEffect(() => {
     if (ticketId) loadTicket();
   }, [ticketId]);
+
+  // Real-time socket room and event listeners for workstation
+  useEffect(() => {
+    if (!socket || !ticketId) return;
+
+    socket.emit('join_ticket', ticketId);
+
+    const onCommentAdded = ({ comment }) => {
+      if (comment) {
+        setComments((prev) => {
+          if (prev.some((c) => c._id === comment._id)) return prev;
+          return [...prev, comment];
+        });
+      }
+    };
+
+    const onWorkLogAdded = ({ workLog }) => {
+      if (workLog) {
+        setWorkLogs((prev) => {
+          if (prev.some((w) => w._id === workLog._id)) return prev;
+          return [workLog, ...prev];
+        });
+      }
+    };
+
+    const onTicketUpdated = (updated) => {
+      if (updated && updated._id === ticketId) {
+        setTicket(updated);
+      }
+    };
+
+    socket.on('ticket:comment', onCommentAdded);
+    socket.on('ticket:worklog', onWorkLogAdded);
+    socket.on('ticket:updated', onTicketUpdated);
+
+    return () => {
+      socket.emit('leave_ticket', ticketId);
+      socket.off('ticket:comment', onCommentAdded);
+      socket.off('ticket:worklog', onWorkLogAdded);
+      socket.off('ticket:updated', onTicketUpdated);
+    };
+  }, [socket, ticketId]);
 
   // Live stopwatch effect
   useEffect(() => {
@@ -92,9 +199,10 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
     try {
       await apiRequest(`/tickets/${ticketId}/start`, { method: 'POST' });
       setTimerRunning(true);
+      toast.success('Ticket marked In Progress. Stopwatch timer started.');
       await loadTicket();
     } catch (err) {
-      alert('Failed to start ticket: ' + err.message);
+      toast.error('Failed to start ticket: ' + err.message);
     }
   };
 
@@ -115,9 +223,10 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
         setComments((prev) => [...prev, res.data]);
         setMessageText('');
         setAttachments([]);
+        toast.success(isInternal ? 'Internal note added' : 'Public reply sent');
       }
     } catch (err) {
-      alert('Failed to send comment: ' + err.message);
+      toast.error('Failed to send message: ' + err.message);
     } finally {
       setSubmittingComment(false);
     }
@@ -166,9 +275,10 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
         setLogDescription('');
         setTimerSeconds(0);
         setTimerRunning(false);
+        toast.success(`Logged ${logMinutes} minutes of work`);
       }
     } catch (err) {
-      alert('Failed to record work log: ' + err.message);
+      toast.error('Failed to record work log: ' + err.message);
     } finally {
       setSubmittingLog(false);
     }
@@ -184,10 +294,11 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
       const res = await resolveTicket(ticketId, resolutionSummary.trim());
       if (res.success) {
         setShowResolveModal(false);
+        toast.success('Ticket marked as Resolved');
         await loadTicket();
       }
     } catch (err) {
-      alert('Failed to resolve ticket: ' + err.message);
+      toast.error('Failed to resolve ticket: ' + err.message);
     } finally {
       setSubmittingResolution(false);
     }
@@ -281,15 +392,37 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
           <div className="p-5 border-b border-[#e5e5e5] bg-[#fafafa]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[12px] font-mono uppercase tracking-wider text-[#737373]">
-                Issue Description & AI Diagnostics
+                Issue Description & Diagnostics
               </span>
               <span className={`px-2 py-0.5 rounded text-[11px] font-mono ${getPriorityBadge(ticket.priority)}`}>
                 {ticket.priority} Priority
               </span>
             </div>
-            <p className="text-[14px] text-[#171717] whitespace-pre-line leading-relaxed">
-              {ticket.description}
-            </p>
+            <div className="text-[14px] text-[#171717] leading-relaxed prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  h3: ({ children }) => <h3 className="font-semibold text-[14px] text-[#0a0a0a] mt-3 mb-1 first:mt-0">{children}</h3>,
+                  h4: ({ children }) => <h4 className="font-semibold text-[13px] text-[#0a0a0a] mt-2 mb-1">{children}</h4>,
+                  p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed text-[#262626]">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 space-y-1 my-2 text-[#262626]">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1 my-2 text-[#262626]">{children}</ol>,
+                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold text-[#0a0a0a]">{children}</strong>,
+                  code: ({ children }) => (
+                    <code className="px-1.5 py-0.5 bg-[#f0f0f0] border border-[#e5e5e5] rounded text-[12px] font-mono text-[#0a0a0a]">
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="p-3 bg-[#0a0a0a] text-[#fafafa] rounded-[8px] text-[12px] font-mono overflow-x-auto my-2">
+                      {children}
+                    </pre>
+                  ),
+                }}
+              >
+                {ticket.description}
+              </ReactMarkdown>
+            </div>
           </div>
 
           {/* Tab Filter Header: All vs Public vs Internal Notes */}
@@ -471,8 +604,65 @@ export default function TechTicketWorkstation({ ticketId, onBack }) {
 
         {/* Right Column (35%): SLA Timer, Work Logger, Asset & User Context */}
         <div className="lg:col-span-4 space-y-4">
+          {/* Manager Operations & Escalation Card */}
+          {isManagerOrAdmin && (
+            <div className="bg-[#ffffff] border border-blue-200 rounded-[16px] p-5 space-y-3.5 shadow-sm">
+              <div className="flex items-center justify-between text-[12px] font-mono uppercase text-[#2563eb] font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5" /> Manager Controls
+                </span>
+                <span className="bg-blue-50 px-2 py-0.5 rounded text-[10px] text-blue-700">Dispatch & SLA</span>
+              </div>
+
+              {/* Assign / Reassign Tech Dropdown */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono uppercase text-[#737373] block">
+                  Assignee / Technician
+                </label>
+                <select
+                  disabled={reassigning}
+                  value={ticket.assignee?._id || ''}
+                  onChange={(e) => handleReassignTech(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-[#fafafa] border border-[#e5e5e5] rounded-[6px] text-[12px] text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {technicians.map((t) => (
+                    <option key={t._id} value={t._id}>
+                      {t.name} ({t.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priority Escalation */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono uppercase text-[#737373] block">
+                  Priority & SLA Escalation
+                </label>
+                <div className="grid grid-cols-4 gap-1">
+                  {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      disabled={updatingPriority}
+                      onClick={() => handleEscalatePriority(p)}
+                      className={`py-1 text-[10px] font-mono font-semibold rounded border transition-all ${
+                        ticket.priority === p
+                          ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
+                          : 'bg-[#fafafa] text-[#525252] border-[#e5e5e5] hover:bg-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Live SLA Countdown Card */}
           <div className="bg-[#ffffff] border border-[#e5e5e5] rounded-[16px] p-5 space-y-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+
             <div className="flex items-center justify-between text-[12px] font-mono uppercase text-[#737373]">
               <span>SLA Target Deadlines</span>
               {ticket.slaStatus === 'BREACHED' ? (

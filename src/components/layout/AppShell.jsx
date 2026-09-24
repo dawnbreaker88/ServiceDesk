@@ -16,6 +16,9 @@ import {
   Settings,
   Users,
   AlertOctagon,
+  Building2,
+  FolderTree,
+  Bot,
 } from 'lucide-react';
 
 export default function AppShell({ activePage, setActivePage, children }) {
@@ -26,7 +29,20 @@ export default function AppShell({ activePage, setActivePage, children }) {
   const getNavItems = () => {
     const role = user?.role || 'EMPLOYEE';
 
-    if (role === 'MANAGER' || role === 'ADMIN' || role === 'ASSET_MANAGER') {
+    if (role === 'ADMIN') {
+      return [
+        { id: 'admin-overview', label: 'System Console', icon: LayoutDashboard },
+        { id: 'admin-users', label: 'User Directory', icon: Users },
+        { id: 'admin-departments', label: 'Departments', icon: Building2 },
+        { id: 'admin-categories', label: 'Taxonomy', icon: FolderTree },
+        { id: 'admin-sla', label: 'SLA Matrix', icon: ShieldCheck },
+        { id: 'tech-queue', label: 'Ticket Dispatch', icon: Layers },
+        { id: 'mgr-assets', label: 'Asset Fleet', icon: Laptop },
+        { id: 'mgr-audit', label: 'Audit Trail', icon: BarChart3 },
+      ];
+    }
+
+    if (role === 'MANAGER' || role === 'ASSET_MANAGER') {
       return [
         { id: 'mgr-overview', label: 'Operations Overview', icon: LayoutDashboard },
         { id: 'tech-queue', label: 'Ticket Dispatch', icon: Layers },
@@ -37,6 +53,7 @@ export default function AppShell({ activePage, setActivePage, children }) {
         { id: 'guides', label: 'Knowledge Base', icon: BookOpen },
       ];
     }
+
 
     if (role === 'TECHNICIAN') {
       return [

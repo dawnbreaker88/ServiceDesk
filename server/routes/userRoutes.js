@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get('/', isAdminOrManager, getUsers);
+router.get('/', getUsers);
 router.post('/', authorize('ADMIN'), createUser);
 router.get('/:id', getUserById);
 router.patch('/:id', authorize('ADMIN', 'MANAGER'), updateUser);

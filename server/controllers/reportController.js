@@ -274,3 +274,24 @@ export const getAssetReports = async (req, res) => {
     categoryBreakdown,
   });
 };
+
+// @desc    Get work logs history (technicians see own, managers see all)
+// @route   GET /api/reports/worklogs
+// @access  Private (IT Staff)
+export const getWorkLogs = async (req, res) => {
+  const query = {};
+  if (req.user.role === 'TECHNICIAN') {
+    query.technician = req.user._id;
+  }
+  const workLogs = await WorkLog.find(query)
+    .populate('technician', 'name email avatar')
+    .populate('ticket', 'ticketNumber title priority status')
+    .sort({ createdAt: -1 })
+    .limit(100);
+
+  res.status(200).json({
+    success: true,
+    count: workLogs.length,
+    data: workLogs,
+  });
+};

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { getTickets } from '../../api/ticketApi';
 import { apiRequest } from '../../api/client';
 import {
@@ -19,8 +20,12 @@ import {
   Briefcase,
 } from 'lucide-react';
 
+import { useSocket } from '../../context/SocketContext';
+
 export default function TechQueue({ onSelectTicket, initialTab = 'all' }) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { socket } = useSocket();
   const [tickets, setTickets] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [activeTab, setActiveTab] = useState(initialTab); // 'all' | 'assignedToMe' | 'unassigned' | 'urgent'
@@ -75,8 +80,9 @@ export default function TechQueue({ onSelectTicket, initialTab = 'all' }) {
       }
 
       if (userRes.success) {
+        // Strictly only show TECHNICIAN accounts for dispatch
         const techs = (userRes.data || []).filter(
-          (u) => ['TECHNICIAN', 'MANAGER', 'ADMIN'].includes(u.role) && u.status === 'ACTIVE'
+          (u) => u.role === 'TECHNICIAN' && u.status === 'ACTIVE'
         );
         setTechnicians(techs);
       }
@@ -91,15 +97,36 @@ export default function TechQueue({ onSelectTicket, initialTab = 'all' }) {
     loadData();
   }, [activeTab, filterPriority, filterCategory, search]);
 
+  // Real-time socket updates for queue
+  useEffect(() => {
+    if (!socket) return;
+    const handleTicketEvent = () => {
+      loadData();
+    };
+
+    socket.on('ticket:created', handleTicketEvent);
+    socket.on('ticket:updated', handleTicketEvent);
+    socket.on('ticket:assigned', handleTicketEvent);
+    socket.on('ticket:resolved', handleTicketEvent);
+
+    return () => {
+      socket.off('ticket:created', handleTicketEvent);
+      socket.off('ticket:updated', handleTicketEvent);
+      socket.off('ticket:assigned', handleTicketEvent);
+      socket.off('ticket:resolved', handleTicketEvent);
+    };
+  }, [socket, activeTab, filterPriority, filterCategory, search]);
+
   // One-click claim / assign to myself (Technicians)
   const handleClaimTicket = async (e, ticketId) => {
     e.stopPropagation();
     setClaimingId(ticketId);
     try {
       await apiRequest(`/tickets/${ticketId}/start`, { method: 'POST' });
+      toast.success('Ticket claimed successfully!');
       await loadData();
     } catch (err) {
-      alert('Failed to claim ticket: ' + err.message);
+      toast.error('Failed to claim ticket: ' + err.message);
     } finally {
       setClaimingId(null);
     }
@@ -118,16 +145,18 @@ export default function TechQueue({ onSelectTicket, initialTab = 'all' }) {
       });
 
       if (res.success) {
+        toast.success(`Ticket ${assigningTicket.ticketNumber} dispatched!`);
         setAssigningTicket(null);
         setSelectedTechId('');
         await loadData();
       }
     } catch (err) {
-      alert('Failed to dispatch ticket: ' + err.message);
+      toast.error('Failed to dispatch ticket: ' + err.message);
     } finally {
       setDispatching(false);
     }
   };
+
 
   const getPriorityBadge = (p) => {
     switch (p) {

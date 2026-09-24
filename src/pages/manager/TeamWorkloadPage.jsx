@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../../api/client';
+import { useToast } from '../../context/ToastContext';
 import { Users, Layers, Clock, CheckCircle2, UserPlus, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function TeamWorkloadPage({ onSelectTicket }) {
+  const { toast } = useToast();
   const [techReport, setTechReport] = useState([]);
   const [unassignedTickets, setUnassignedTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,17 +50,19 @@ export default function TeamWorkloadPage({ onSelectTicket }) {
       });
 
       if (res.success) {
+        toast.success(`Ticket ${targetTicket.ticketNumber} assigned successfully!`);
         setShowAssignModal(false);
         setTargetTicket(null);
         setSelectedTechId('');
         await loadData();
       }
     } catch (err) {
-      alert('Failed to assign ticket: ' + err.message);
+      toast.error('Failed to assign ticket: ' + err.message);
     } finally {
       setAssigning(false);
     }
   };
+
 
   return (
     <div className="space-y-8">

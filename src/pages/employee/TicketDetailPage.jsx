@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { getTicketById, addComment, closeTicket, reopenTicket } from '../../api/ticketApi';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import TicketTimeline from '../../components/tickets/TicketTimeline';
 import { apiRequest } from '../../api/client';
 import {
@@ -21,13 +23,18 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+import { useSocket } from '../../context/SocketContext';
+
 export default function TicketDetailPage({ ticketId, onBack }) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { socket } = useSocket();
   const [ticket, setTicket] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [submittingComment, setSubmittingComment] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -52,6 +59,37 @@ export default function TicketDetailPage({ ticketId, onBack }) {
     if (ticketId) loadTicket();
   }, [ticketId]);
 
+  // Real-time socket room and event listeners for employee ticket detail
+  useEffect(() => {
+    if (!socket || !ticketId) return;
+
+    socket.emit('join_ticket', ticketId);
+
+    const onCommentAdded = ({ comment }) => {
+      if (comment && !comment.isInternal) {
+        setComments((prev) => {
+          if (prev.some((c) => c._id === comment._id)) return prev;
+          return [...prev, comment];
+        });
+      }
+    };
+
+    const onTicketUpdated = (updated) => {
+      if (updated && updated._id === ticketId) {
+        setTicket(updated);
+      }
+    };
+
+    socket.on('ticket:comment', onCommentAdded);
+    socket.on('ticket:updated', onTicketUpdated);
+
+    return () => {
+      socket.emit('leave_ticket', ticketId);
+      socket.off('ticket:comment', onCommentAdded);
+      socket.off('ticket:updated', onTicketUpdated);
+    };
+  }, [socket, ticketId]);
+
   const handleSendComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim() && commentAttachments.length === 0) return;
@@ -67,9 +105,10 @@ export default function TicketDetailPage({ ticketId, onBack }) {
         setComments((prev) => [...prev, res.data]);
         setNewComment('');
         setCommentAttachments([]);
+        toast.success('Message posted.');
       }
     } catch (err) {
-      alert('Failed to send comment: ' + err.message);
+      toast.error('Failed to send comment: ' + err.message);
     } finally {
       setSubmittingComment(false);
     }
@@ -94,9 +133,10 @@ export default function TicketDetailPage({ ticketId, onBack }) {
               url: reader.result,
             }),
           });
+          toast.success(`Attached ${file.name}`);
           await loadTicket();
         } catch (err) {
-          alert(`Failed to attach ${file.name}: ${err.message}`);
+          toast.error(`Failed to attach ${file.name}: ${err.message}`);
         }
       };
       reader.readAsDataURL(file);
@@ -131,10 +171,11 @@ export default function TicketDetailPage({ ticketId, onBack }) {
     try {
       const res = await closeTicket(ticketId);
       if (res.success) {
+        toast.success('Ticket closed and resolved.');
         await loadTicket();
       }
     } catch (err) {
-      alert('Failed to close ticket: ' + err.message);
+      toast.error('Failed to close ticket: ' + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -150,14 +191,16 @@ export default function TicketDetailPage({ ticketId, onBack }) {
       if (res.success) {
         setReopenPrompt(false);
         setRejectionReason('');
+        toast.success('Ticket reopened.');
         await loadTicket();
       }
     } catch (err) {
-      alert('Failed to reopen ticket: ' + err.message);
+      toast.error('Failed to reopen ticket: ' + err.message);
     } finally {
       setActionLoading(false);
     }
   };
+
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -306,9 +349,31 @@ export default function TicketDetailPage({ ticketId, onBack }) {
             <div className="text-[12px] font-mono uppercase tracking-wider text-[#737373] mb-1.5">
               Issue Description & Background
             </div>
-            <p className="text-[14px] text-[#171717] whitespace-pre-line leading-relaxed">
-              {ticket.description}
-            </p>
+            <div className="text-[14px] text-[#171717] leading-relaxed prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  h3: ({ children }) => <h3 className="font-semibold text-[14px] text-[#0a0a0a] mt-3 mb-1 first:mt-0">{children}</h3>,
+                  h4: ({ children }) => <h4 className="font-semibold text-[13px] text-[#0a0a0a] mt-2 mb-1">{children}</h4>,
+                  p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed text-[#262626]">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 space-y-1 my-2 text-[#262626]">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1 my-2 text-[#262626]">{children}</ol>,
+                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold text-[#0a0a0a]">{children}</strong>,
+                  code: ({ children }) => (
+                    <code className="px-1.5 py-0.5 bg-[#f0f0f0] border border-[#e5e5e5] rounded text-[12px] font-mono text-[#0a0a0a]">
+                      {children}
+                    </code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="p-3 bg-[#0a0a0a] text-[#fafafa] rounded-[8px] text-[12px] font-mono overflow-x-auto my-2">
+                      {children}
+                    </pre>
+                  ),
+                }}
+              >
+                {ticket.description}
+              </ReactMarkdown>
+            </div>
 
             {/* Ticket Level Attachments */}
             {ticket.attachments && ticket.attachments.length > 0 && (

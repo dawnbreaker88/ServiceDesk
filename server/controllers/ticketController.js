@@ -7,6 +7,7 @@ import { generateNextTicketNumber } from '../utils/ticketNumber.js';
 import { calculateSlaDeadlines } from '../utils/slaCalculator.js';
 import { recordAuditLog } from '../utils/audit.js';
 import { createNotification, notifyRoleUsers } from '../utils/notificationHelper.js';
+import { emitEvent } from '../socket.js';
 
 // @desc    Get tickets with scoping, filtering, and pagination
 // @route   GET /api/tickets
@@ -198,6 +199,8 @@ export const createTicket = async (req, res) => {
     relatedId: ticket._id,
   });
 
+  emitEvent('ticket:created', populated);
+
   res.status(201).json({
     success: true,
     message: 'Ticket created successfully',
@@ -258,6 +261,9 @@ export const updateTicket = async (req, res) => {
     .populate('department', 'name code')
     .populate('category', 'name code icon')
     .populate('asset');
+
+  emitEvent('ticket:updated', updated);
+  emitEvent('ticket:updated', updated, `ticket:${ticket._id}`);
 
   res.status(200).json({
     success: true,
@@ -323,6 +329,9 @@ export const assignTicket = async (req, res) => {
     .populate('department', 'name code')
     .populate('category', 'name code icon');
 
+  emitEvent('ticket:assigned', updated);
+  emitEvent('ticket:updated', updated, `ticket:${ticket._id}`);
+
   res.status(200).json({
     success: true,
     message: `Ticket assigned to ${tech.name}`,
@@ -359,6 +368,15 @@ export const startTicket = async (req, res) => {
     newState: { status: 'IN_PROGRESS' },
     details: `Work started on ${ticket.ticketNumber} by ${req.user.name}`,
   });
+
+  const updated = await Ticket.findById(ticket._id)
+    .populate('requester', 'name email department avatar')
+    .populate('assignee', 'name email avatar')
+    .populate('department', 'name code')
+    .populate('category', 'name code icon');
+
+  emitEvent('ticket:updated', updated);
+  emitEvent('ticket:updated', updated, `ticket:${ticket._id}`);
 
   res.status(200).json({
     success: true,
@@ -427,6 +445,9 @@ export const addComment = async (req, res) => {
     });
   }
 
+  emitEvent('ticket:comment', { ticketId: ticket._id, comment: populatedComment });
+  emitEvent('ticket:comment', { ticketId: ticket._id, comment: populatedComment }, `ticket:${ticket._id}`);
+
   res.status(201).json({
     success: true,
     message: 'Comment added successfully',
@@ -468,6 +489,8 @@ export const addWorkLog = async (req, res) => {
   }
 
   const populated = await WorkLog.findById(workLog._id).populate('technician', 'name email avatar');
+
+  emitEvent('ticket:worklog', { ticketId: ticket._id, workLog: populated }, `ticket:${ticket._id}`);
 
   res.status(201).json({
     success: true,
@@ -518,10 +541,19 @@ export const resolveTicket = async (req, res) => {
     relatedId: ticket._id,
   });
 
+  const updated = await Ticket.findById(ticket._id)
+    .populate('requester', 'name email department avatar')
+    .populate('assignee', 'name email avatar')
+    .populate('department', 'name code')
+    .populate('category', 'name code icon');
+
+  emitEvent('ticket:resolved', updated);
+  emitEvent('ticket:updated', updated, `ticket:${ticket._id}`);
+
   res.status(200).json({
     success: true,
     message: 'Ticket marked as resolved',
-    data: ticket,
+    data: updated,
   });
 };
 

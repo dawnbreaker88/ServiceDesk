@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { SocketProvider } from './context/SocketContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import AppShell from './components/layout/AppShell';
@@ -25,14 +27,22 @@ import ManagerSlaPage from './pages/manager/ManagerSlaPage';
 import TeamWorkloadPage from './pages/manager/TeamWorkloadPage';
 import AuditLogsPage from './pages/manager/AuditLogsPage';
 
+// Admin System Pages
+import AdminOverview from './pages/admin/AdminOverview';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminDepartments from './pages/admin/AdminDepartments';
+import AdminCategories from './pages/admin/AdminCategories';
+import AdminSla from './pages/admin/AdminSla';
+
 function MainApp() {
   const { user, isAuthenticated } = useAuth();
   const [view, setView] = useState('landing'); // 'landing' | 'login'
+  const isAdmin = user?.role === 'ADMIN';
   const isManagerOrAdmin = user && ['MANAGER', 'ADMIN', 'ASSET_MANAGER'].includes(user.role);
   const isItStaff = user && ['TECHNICIAN', 'MANAGER', 'ADMIN', 'ASSET_MANAGER'].includes(user.role);
 
   const [activePage, setActivePage] = useState(
-    isManagerOrAdmin ? 'mgr-overview' : isItStaff ? 'tech-dashboard' : 'home'
+    isAdmin ? 'admin-overview' : isManagerOrAdmin ? 'mgr-overview' : isItStaff ? 'tech-dashboard' : 'home'
   );
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [queueTab, setQueueTab] = useState('all');
@@ -41,7 +51,9 @@ function MainApp() {
   // Synchronize default page when user logs in with role
   useEffect(() => {
     if (user) {
-      if (['MANAGER', 'ADMIN', 'ASSET_MANAGER'].includes(user.role)) {
+      if (user.role === 'ADMIN') {
+        setActivePage('admin-overview');
+      } else if (['MANAGER', 'ASSET_MANAGER'].includes(user.role)) {
         setActivePage('mgr-overview');
       } else if (user.role === 'TECHNICIAN') {
         setActivePage('tech-dashboard');
@@ -83,6 +95,46 @@ function MainApp() {
         }}
         onBackToLanding={() => setView('landing')}
       >
+        {/* ─── Global Workstation Views for Any Ticket Selection ────── */}
+        {activePage === 'tech-workstation' && selectedTicketId && (
+          <TechTicketWorkstation
+            ticketId={selectedTicketId}
+            onBack={() => setActivePage(isAdmin ? 'admin-overview' : isManagerOrAdmin ? 'mgr-overview' : 'tech-queue')}
+          />
+        )}
+
+        {activePage === 'ticket-detail' && selectedTicketId && (
+          <TicketDetailPage
+            ticketId={selectedTicketId}
+            onBack={() => setActivePage('tickets')}
+          />
+        )}
+
+        {/* ─── Admin Specific Views ─────────────────────────────────────── */}
+        {isAdmin && (
+          <>
+            {activePage === 'admin-overview' && (
+              <AdminOverview onNavigate={(page) => setActivePage(page)} />
+            )}
+
+            {activePage === 'admin-users' && (
+              <AdminUsers />
+            )}
+
+            {activePage === 'admin-departments' && (
+              <AdminDepartments />
+            )}
+
+            {activePage === 'admin-categories' && (
+              <AdminCategories />
+            )}
+
+            {activePage === 'admin-sla' && (
+              <AdminSla />
+            )}
+          </>
+        )}
+
         {/* ─── Manager & Operations Views ───────────────────────────────── */}
         {isManagerOrAdmin && (
           <>
@@ -125,13 +177,6 @@ function MainApp() {
               />
             )}
 
-            {activePage === 'tech-workstation' && selectedTicketId && (
-              <TechTicketWorkstation
-                ticketId={selectedTicketId}
-                onBack={() => setActivePage('tech-queue')}
-              />
-            )}
-
             {activePage === 'tech-worklogs' && (
               <TechWorkLogsPage onSelectTicket={handleSelectTicket} />
             )}
@@ -170,13 +215,6 @@ function MainApp() {
               />
             )}
 
-            {activePage === 'ticket-detail' && selectedTicketId && (
-              <TicketDetailPage
-                ticketId={selectedTicketId}
-                onBack={() => setActivePage('tickets')}
-              />
-            )}
-
             {activePage === 'devices' && (
               <MyDevicesPage
                 onStartSupportWithAsset={(assetName) =>
@@ -206,7 +244,13 @@ function MainApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <ToastProvider>
+        <SocketProvider>
+          <MainApp />
+        </SocketProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
+
+

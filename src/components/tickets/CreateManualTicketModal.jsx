@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createTicket } from '../../api/ticketApi';
 import { getCategories } from '../../api/guideApi';
 import { getMyAssets } from '../../api/assetApi';
+import { useToast } from '../../context/ToastContext';
 import {
   X,
   Paperclip,
@@ -15,7 +16,9 @@ import {
 } from 'lucide-react';
 
 export default function CreateManualTicketModal({ isOpen, onClose, onTicketCreated }) {
+  const { toast } = useToast();
   const [title, setTitle] = useState('');
+
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
@@ -81,7 +84,7 @@ export default function CreateManualTicketModal({ isOpen, onClose, onTicketCreat
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !categoryId) {
-      alert('Please fill out the title, description, and select a category.');
+      toast.warning('Please fill out the title, description, and select a category.');
       return;
     }
 
@@ -99,6 +102,7 @@ export default function CreateManualTicketModal({ isOpen, onClose, onTicketCreat
 
       const res = await createTicket(payload);
       if (res.success && res.data) {
+        toast.success(`Ticket #${res.data.ticketNumber || ''} created successfully!`);
         // Reset form
         setTitle('');
         setDescription('');
@@ -109,11 +113,12 @@ export default function CreateManualTicketModal({ isOpen, onClose, onTicketCreat
         onClose();
       }
     } catch (err) {
-      alert('Failed to submit ticket: ' + err.message);
+      toast.error('Failed to submit ticket: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
+
 
   const formatFileSize = (bytes) => {
     if (!bytes) return '0 KB';

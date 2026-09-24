@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import {
   IT_SUPPORT_SYSTEM_PROMPT,
   TICKET_CLASSIFICATION_PROMPT,
+  ESCALATION_SUMMARY_PROMPT,
 } from './aiPrompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -211,6 +212,25 @@ export class UniversalAIService {
       return JSON.parse(cleanJson);
     } catch (error) {
       console.warn(`[AI Classify Warning] ${this.provider.toUpperCase()} classification failed: ${error.message}. Falling back.`);
+      return null;
+    }
+  }
+
+  /**
+   * Synthesize conversation into a structured technician ticket description
+   */
+  async generateEscalationSummary(conversationHistory) {
+    if (!this.hasApiKey() || !conversationHistory || conversationHistory.length === 0) {
+      return null;
+    }
+
+    try {
+      if (this.provider === 'gemini') {
+        return await this.callGemini(ESCALATION_SUMMARY_PROMPT, conversationHistory, 0.2);
+      }
+      return await this.callOpenAiCompatible(ESCALATION_SUMMARY_PROMPT, conversationHistory, 0.2);
+    } catch (error) {
+      console.warn(`[AI Summary Warning] ${this.provider.toUpperCase()} escalation summary failed: ${error.message}.`);
       return null;
     }
   }
