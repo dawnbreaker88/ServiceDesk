@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowLeft, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
+import { ArrowLeft, Lock, Mail, AlertCircle, ArrowRight, Sun, Moon } from 'lucide-react';
 
 export default function LoginPage({ onBackToLanding }) {
   const { login } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,36 +26,49 @@ export default function LoginPage({ onBackToLanding }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#ffffff] text-[#171717] flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-grid-pattern">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <button
-          onClick={onBackToLanding}
-          className="mb-8 inline-flex items-center gap-2 text-[13px] text-[#737373] hover:text-[#0a0a0a] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Landing Page</span>
-        </button>
+    <div className="min-h-screen bg-[#ffffff] dark:bg-[#09090b] text-[#171717] dark:text-[#f4f4f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-grid-pattern transition-colors duration-200">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
+        <div className="flex items-center justify-between mb-8 px-4 sm:px-0">
+          <button
+            onClick={onBackToLanding}
+            className="inline-flex items-center gap-2 text-[13px] text-[#737373] dark:text-[#a1a1aa] hover:text-[#0a0a0a] dark:hover:text-[#f4f4f5] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Landing Page</span>
+          </button>
+
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded-[8px] text-[#737373] dark:text-[#a1a1aa] hover:text-[#0a0a0a] dark:hover:text-[#f4f4f5] hover:bg-[#f5f5f5] dark:hover:bg-[#18181b] border border-[#e5e5e5] dark:border-[#27272a] transition-all cursor-pointer shadow-2xs"
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+          </button>
+        </div>
 
         <div className="flex items-center gap-3 justify-center mb-4">
-          <div className="w-9 h-9 rounded-[8px] bg-[#0a0a0a] flex items-center justify-center text-white font-mono text-sm font-semibold tracking-wider">
-            SD
-          </div>
-          <span className="font-display font-bold text-2xl tracking-tight text-[#0a0a0a]">
+          <img
+            src="/favicon.svg"
+            alt="ServiceDesk Logo"
+            className="w-9 h-9 object-contain rounded-md"
+          />
+          <span className="font-display font-bold text-2xl tracking-tight text-[#0a0a0a] dark:text-[#f4f4f5]">
             ServiceDesk<span className="text-[#2563eb]">.</span>
           </span>
         </div>
-        <h2 className="text-center font-display font-medium text-2xl text-[#0a0a0a] tracking-tight">
+        <h2 className="text-center font-display font-medium text-2xl text-[#0a0a0a] dark:text-[#f4f4f5] tracking-tight">
           Sign in to your workspace
         </h2>
-        <p className="mt-2 text-center text-[14px] text-[#737373]">
+        <p className="mt-2 text-center text-[14px] text-[#737373] dark:text-[#a1a1aa]">
           Enter your organization credentials to continue
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-[#ffffff] py-8 px-6 sm:px-8 border border-[#e5e5e5] rounded-[16px] shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+        <div className="bg-[#ffffff] dark:bg-[#121215] py-8 px-6 sm:px-8 border border-[#e5e5e5] dark:border-[#27272a] rounded-[16px] shadow-[0_10px_30px_rgba(0,0,0,0.04)] dark:shadow-none">
           {error && (
-            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-[8px] flex items-center gap-2 text-[13px] text-red-700">
+            <div className="mb-5 p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-[8px] flex items-center gap-2 text-[13px] text-red-700 dark:text-red-400">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>

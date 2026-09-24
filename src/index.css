@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Dub / Linear Design Tokens */
   --color-canvas-white: #ffffff;
@@ -39,18 +41,115 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f5f5f5;
+  --accent-foreground: #171717;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #0a0a0a;
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Satoshi', sans-serif;
   --font-mono: 'Geist Mono', monospace;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #121215;
+  --card-foreground: #f4f4f5;
+  --popover: #121215;
+  --popover-foreground: #f4f4f5;
+  --primary: #f4f4f5;
+  --primary-foreground: #09090b;
+  --secondary: #1e1e24;
+  --secondary-foreground: #f4f4f5;
+  --muted: #1e1e24;
+  --muted-foreground: #a1a1aa;
+  --accent: #1e1e24;
+  --accent-foreground: #f4f4f5;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f4f4f5;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #a1a1aa;
+  color-scheme: dark;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #ffffff;
-  color: #171717;
+  background-color: var(--background);
+  color: var(--foreground);
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dark body {
+  background-color: #09090b;
+  color: #f4f4f5;
+}
+
+/* Comprehensive Dark Mode Fallback Overrides for Custom HEX Utility Classes */
+.dark .bg-\[\#ffffff\],
+.dark .bg-white {
+  background-color: #121215 !important;
+}
+
+.dark .bg-\[\#fafafa\] {
+  background-color: #09090b !important;
+}
+
+.dark .bg-\[\#f5f5f5\] {
+  background-color: #18181b !important;
+}
+
+.dark .border-\[\#e5e5e5\],
+.dark .border-\[\#d4d4d4\] {
+  border-color: #27272a !important;
+}
+
+.dark .text-\[\#0a0a0a\],
+.dark .text-\[\#171717\] {
+  color: #f4f4f5 !important;
+}
+
+.dark .text-\[\#525252\],
+.dark .text-\[\#737373\] {
+  color: #a1a1aa !important;
+}
+
+.dark .hover\:bg-\[\#fafafa\]:hover {
+  background-color: #18181b !important;
+}
+
+.dark .hover\:bg-\[\#f5f5f5\]:hover {
+  background-color: #27272a !important;
+}
+
+.dark input:not([type='checkbox']):not([type='radio']),
+.dark textarea,
+.dark select {
+  background-color: #18181b !important;
+  border-color: #27272a !important;
+  color: #f4f4f5 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #71717a !important;
 }
 
 h1, h2, h3, .font-display {
@@ -67,11 +166,20 @@ code, kbd, samp, pre, .font-mono {
   background-size: 24px 24px;
 }
 
+.dark .bg-grid-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+}
+
 /* Hairline Container Utility */
 .hairline-card {
   background-color: #ffffff;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
+}
+
+.dark .hairline-card {
+  background-color: #121215;
+  border-color: #27272a;
 }
 
 .hairline-card-hover {
@@ -81,7 +189,17 @@ code, kbd, samp, pre, .font-mono {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.dark .hairline-card-hover {
+  background-color: #121215;
+  border-color: #27272a;
+}
+
 .hairline-card-hover:hover {
   border-color: #d4d4d4;
   box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+}
+
+.dark .hairline-card-hover:hover {
+  border-color: #3f3f46;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
 }
