@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { ToastProvider } from './context/ToastContext';
-import { SocketProvider } from './context/SocketContext';
-import { TooltipProvider } from './components/ui/tooltip';
+import { ThemeProvider } from './context/ThemeContext.jsx';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import { ToastProvider } from './context/ToastContext.jsx';
+import { SocketProvider } from './context/SocketContext.jsx';
+import { TooltipProvider } from './components/ui/tooltip.jsx';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import AppShell from './components/layout/AppShell';
