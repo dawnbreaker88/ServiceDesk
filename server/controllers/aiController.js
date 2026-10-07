@@ -404,25 +404,43 @@ export const aiEscalate = async (req, res) => {
     finalCategory = defaultCat?._id;
   }
 
-  const ticketNumber = await generateNextTicketNumber();
   const slaInfo = await calculateSlaDeadlines(priority);
 
-  const ticket = await Ticket.create({
-    ticketNumber,
-    title: finalTitle,
-    description: fullDescription,
-    requester: req.user._id,
-    department: req.user.department || null,
-    category: finalCategory,
-    priority,
-    status: 'OPEN',
-    asset: assetId || null,
-    slaPolicy: slaInfo.slaPolicyId,
-    responseDeadline: slaInfo.responseDeadline,
-    resolutionDeadline: slaInfo.resolutionDeadline,
-    source: 'AI_ASSISTANT',
-    tags: ['ai-escalated'],
-  });
+  let ticket;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      const ticketNumber = await generateNextTicketNumber();
+      ticket = await Ticket.create({
+        ticketNumber,
+        title: finalTitle,
+        description: fullDescription,
+        requester: req.user._id,
+        department: req.user.department || null,
+        category: finalCategory,
+        priority,
+        status: 'OPEN',
+        asset: assetId || null,
+        slaPolicy: slaInfo.slaPolicyId,
+        responseDeadline: slaInfo.responseDeadline,
+        resolutionDeadline: slaInfo.resolutionDeadline,
+        source: 'AI_ASSISTANT',
+        tags: ['ai-escalated'],
+      });
+      break;
+    } catch (err) {
+      if (err.code === 11000 && (err.keyPattern?.ticketNumber || err.message?.includes('ticketNumber'))) {
+        attempts++;
+        if (attempts >= maxAttempts) throw err;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const ticketNumber = ticket.ticketNumber;
 
   if (session) {
     session.status = 'ESCALATED';

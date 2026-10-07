@@ -148,29 +148,46 @@ export const createTicket = async (req, res) => {
     });
   }
 
-  const ticketNumber = await generateNextTicketNumber();
   const slaInfo = await calculateSlaDeadlines(priority);
-
   const requesterId = req.user._id;
   const deptId = department || req.user.department || null;
 
-  const ticket = await Ticket.create({
-    ticketNumber,
-    title,
-    description,
-    requester: requesterId,
-    department: deptId,
-    category,
-    priority,
-    status: 'OPEN',
-    asset: asset || null,
-    slaPolicy: slaInfo.slaPolicyId,
-    responseDeadline: slaInfo.responseDeadline,
-    resolutionDeadline: slaInfo.resolutionDeadline,
-    source,
-    attachments: attachments || [],
-    tags: tags || [],
-  });
+  let ticket;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      const ticketNumber = await generateNextTicketNumber();
+      ticket = await Ticket.create({
+        ticketNumber,
+        title,
+        description,
+        requester: requesterId,
+        department: deptId,
+        category,
+        priority,
+        status: 'OPEN',
+        asset: asset || null,
+        slaPolicy: slaInfo.slaPolicyId,
+        responseDeadline: slaInfo.responseDeadline,
+        resolutionDeadline: slaInfo.resolutionDeadline,
+        source,
+        attachments: attachments || [],
+        tags: tags || [],
+      });
+      break;
+    } catch (err) {
+      if (err.code === 11000 && (err.keyPattern?.ticketNumber || err.message?.includes('ticketNumber'))) {
+        attempts++;
+        if (attempts >= maxAttempts) throw err;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const ticketNumber = ticket.ticketNumber;
 
   // Populate references for response
   const populated = await Ticket.findById(ticket._id)

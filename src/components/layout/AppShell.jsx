@@ -269,12 +269,12 @@ export default function AppShell({ activePage, setActivePage, children }) {
                 )}
               </button>
 
-              <span className="text-[11px] font-mono font-medium text-[#2563eb] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded border border-blue-200 dark:border-blue-900/50">
+              {/* <span className="text-[11px] font-mono font-medium text-[#2563eb] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded border border-blue-200 dark:border-blue-900/50">
                 {user?.role}
               </span>
               <span className="text-[12px] font-mono text-[#737373] dark:text-[#a1a1aa] bg-[#f5f5f5] dark:bg-[#18181b] px-2.5 py-1 rounded border border-[#e5e5e5] dark:border-[#27272a]">
                 {user?.department?.name || 'Enterprise'}
-              </span>
+              </span> */}
             </div>
           </header>
 
