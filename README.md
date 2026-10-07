@@ -37,13 +37,12 @@ An enterprise-grade IT Service Management (ITSM) and Asset Lifecycle platform po
   - [Environment Configuration](#environment-configuration)
   - [Database Seeding](#database-seeding)
   - [Running the Application](#running-the-application)
-- [Demo Credentials](#-demo-credentials)
 - [Automated API Testing](#-automated-api-testing)
 - [Project Directory Structure](#-project-directory-structure)
 
 ---
 
-## 🔭 Overview
+##  Overview
 
 **Servicedesk** modernizes enterprise IT operations by merging self-healing AI diagnostic assistants with standard ITIL service workflows. It replaces clunky ticketing interfaces with a streamlined, real-time reactive workspace designed for employees, IT technicians, department managers, and system administrators.
 
@@ -130,7 +129,7 @@ Whether an employee faces VPN gateway failure, needs software license allocation
 
 ---
 
-## 👥 Key Features by Role
+##  Key Features by Role
 
 | Role | Workspace Capabilities |
 | :--- | :--- |
@@ -141,7 +140,7 @@ Whether an employee faces VPN gateway failure, needs software license allocation
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 - **Frontend Client**: SPA developed with **React 19**, **Vite**, and **Tailwind CSS v4**. Utilizes modern typography (Figtree), Radix UI primitives, Lucide / Hugeicons, and responsive dashboard layouts tailored to each role.
 - **Backend API**: RESTful API running on **Node.js** and **Express 5**, implementing stateless JWT authentication, role guards, and structured error handling.
@@ -151,7 +150,7 @@ Whether an employee faces VPN gateway failure, needs software license allocation
 
 ---
 
-## 💻 Technology Stack
+##  Technology Stack
 
 ```
 Frontend:
@@ -173,7 +172,7 @@ Backend:
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -215,9 +214,6 @@ JWT_EXPIRE=7d
 VITE_API_URL=http://localhost:5000/api
 VITE_SOCKET_URL=http://localhost:5000
 
-# ==============================================================================
-# 🤖 UNIVERSAL AI CONFIGURATION (Choose provider: groq | gemini | openai)
-# ==============================================================================
 
 # Option A: Groq (Recommended for lightning-fast responses)
 AI_PROVIDER=groq
@@ -261,24 +257,10 @@ npm run dev
 
 Navigate to `http://localhost:5173` in your browser.
 
----
-
-## 🔑 Demo Credentials
-
-All seeded demo accounts share the default password: **`Password123!`**
-
-| Persona | Role | Email | Best For Testing |
-| :--- | :--- | :--- | :--- |
-| **Alex Rivera** | `ADMIN` | `admin@servicedesk.com` | User management, SLA policy config, system audit logs |
-| **Elena Rostova** | `MANAGER` | `manager@servicedesk.com` | Ticket dispatch, team workload heatmaps, SLA monitor |
-| **Rahul Sharma** | `TECHNICIAN` | `tech.rahul@servicedesk.com` | Claiming tickets, stopwatch work logging, internal notes |
-| **Sarah Chen** | `TECHNICIAN` | `tech.sarah@servicedesk.com` | SLA breached ticket handling, technician queue |
-| **Prabhath Perera** | `EMPLOYEE` | `emp.prabhath@servicedesk.com` | AI diagnostic console, ticket submission, CSAT review |
-| **Emma Watson** | `EMPLOYEE` | `emp.emma@servicedesk.com` | Submitting hardware dock issues, viewing assigned assets |
 
 ---
 
-## 🧪 Automated API Testing
+##  Automated API Testing
 
 Servicedesk includes a full automated end-to-end REST test suite covering authentication, profile endpoints, asset management, complete ticket lifecycle (create -> assign -> start -> comment -> log -> resolve -> close), AI assistant, notifications, and analytics.
 
@@ -290,7 +272,7 @@ npm run test:api
 
 ---
 
-## 📁 Project Directory Structure
+##  Project Directory Structure
 
 ```text
 ServiceDesk/
